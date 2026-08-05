@@ -1,5 +1,15 @@
 # Deployment Guide — GridWatch
 
+## Current Public Deployment
+
+- Operator console: https://grid-watch-red.vercel.app/
+- Backend: https://gridwatch-api.onrender.com
+- Health check: https://gridwatch-api.onrender.com/api/health
+- API documentation: https://gridwatch-api.onrender.com/docs
+
+The Render backend is on a free instance and can cold-start after inactivity.
+Wait for it to wake, then refresh the Vercel console if the first request fails.
+
 ## Local Development (Docker Compose)
 
 ```bash
@@ -50,7 +60,7 @@ npm run dev -- --port 3000
 2. Point it at the backend service folder if your platform supports a root directory, or use the backend Dockerfile.
 3. Set environment variables:
    - `DATABASE_URL` required, from managed Postgres.
-   - `GEMINI_API_KEY` optional.
+   - `LOCAL_LLM_URL` and `LOCAL_LLM_MODEL` optional; the briefing feature uses a template when no local LLM is available.
    - `HEARTBEAT_SIM_ENABLED=true` recommended for the demo.
 4. Deploy the backend first and note its public API URL, such as `https://gridwatch-api.onrender.com`.
 
@@ -76,6 +86,35 @@ proxy_cache off;
 proxy_set_header Connection '';
 ```
 
+## Environment Variables
+
+Copy `.env.example` to `.env` for local Docker development. Vercel must be
+configured with `VITE_API_URL=https://gridwatch-api.onrender.com/api` for
+production. Do not commit database credentials or any local-LLM credentials.
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `DATABASE_URL` | Yes outside Docker | Docker Postgres URL | Async SQLAlchemy connection URL. Render's `postgresql://` URL is normalized to `postgresql+asyncpg://` by the application. |
+| `GEMINI_API_KEY` | No | empty | Reserved configuration; the current briefing implementation does not call Gemini directly. |
+| `LOCAL_LLM_URL` | No | `http://host.docker.internal:11434/api/generate` | Optional Ollama-compatible endpoint for AI crew briefings. The template is used if unreachable. |
+| `LOCAL_LLM_MODEL` | No | `phi3` | Model name sent to the local-LLM endpoint. |
+| `VITE_API_URL` | Yes on Vercel | `/api` | Public API base URL, including `/api`. |
+| `DEBOUNCE_WINDOW_S` | No | `30` | Wait before treating a power-loss report as dark. |
+| `HEARTBEAT_TIMEOUT_S` | No | `1200` | Silence duration before the watchdog marks a pole stale/dark. |
+| `CANDIDATE_RADIUS_M` | No | `150` | Maximum candidate-edge distance for inferred topology. |
+| `RESTORATION_THRESHOLD` | No | `0.95` | Fraction of affected poles that must be live for verification. |
+| `HEARTBEAT_SIM_ENABLED` | No | `true` | Runs the synthetic heartbeat simulator for the demo. |
+| `HEARTBEAT_INTERVAL_S` | No | `900` | Synthetic heartbeat interval. |
+| `HEARTBEAT_JITTER_S` | No | `45` | Synthetic heartbeat jitter. |
+| `WATCHDOG_INTERVAL_S` | No | `60` | Heartbeat-watchdog scan interval. |
+| `VERIFICATION_INTERVAL_S` | No | `30` | Resolved-ticket verification scan interval. |
+| `STALE_EVENT_THRESHOLD_S` | No | `600` | Threshold used when evaluating delayed events. |
+| `SUSTAIN_WINDOW_S` | No | `60` | Restoration sustain-window configuration. |
+| `OUTAGE_GRACE_BEFORE_M` | No | `15` | Planned-outage early-start grace. |
+| `OUTAGE_OVERRUN_M` | No | `40` | Planned-outage late-restoration grace. |
+| `INGEST_BATCH_SIZE` | No | `500` | Maximum events drained per ingest-worker batch. |
+| `INGEST_BATCH_TIMEOUT_MS` | No | `100` | Reserved batching configuration. |
+
 ## Troubleshooting
 
 ### "Connection refused" on startup
@@ -87,6 +126,24 @@ docker compose restart backend  # Retry
 
 ### Frontend can't reach API
 The Vite dev server proxies `/api` to `http://backend:8000`. In production, set `VITE_API_URL` in Vercel so the frontend points at the public backend URL.
+
+### Render reports it cannot open `/opt/venv/bin/python`
+The final image was using a distroless Python entrypoint, which interpreted the
+virtual-environment Python path as a script. The production Dockerfile uses the
+same `python:3.13-slim` base image for build and runtime, so the copied virtual
+environment has a compatible Python executable. Rebuild/redeploy after changing
+the Dockerfile.
+
+### Render health check times out on port 10000
+Render assigns the service port through `PORT`; it is not always 8000. The
+Docker command reads `PORT` and defaults to 8000 only for local use. Ensure the
+health-check path is `/api/health` and do not hard-code the Render port.
+
+### Render Postgres connection fails with a driver error
+Render supplies `connectionString` in the `postgresql://...` form, whereas the
+async engine requires `postgresql+asyncpg://...`. The application normalizes
+that URL on startup. Keep `DATABASE_URL` referenced from the Render database in
+`render.yaml`; do not paste credentials into the repository.
 
 ### Stale data / want to reset
 ```bash

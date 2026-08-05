@@ -2,13 +2,24 @@
 
 A real-time fault detection and localization system for power distribution networks. Detects outages from pole-mounted sensor telemetry, pinpoints fault boundaries on the physical line, and raises exactly one ticket per fault with explainable confidence scoring.
 
+## Live Demo
+
+- **Operator console:** https://grid-watch-red.vercel.app/
+- **Backend health check:** https://gridwatch-api.onrender.com/api/health
+- **API reference:** https://gridwatch-api.onrender.com/docs
+- **Demo video:** _Add the public or unlisted video link before submitting._
+
+The backend runs on Render's free tier and can take around a minute to wake
+after being idle. If the console initially shows no data, wait for the backend
+to wake and refresh the page.
+
 ## Quick Start
 
 ```bash
 # Clone and start
 git clone <repo>
 cd gridwatch
-cp .env.example .env  # optionally add GEMINI_API_KEY
+cp .env.example .env  # optionally configure a local LLM endpoint for AI briefings
 docker compose up --build
 ```
 
@@ -23,9 +34,9 @@ The system auto-seeds ~3,000 poles across 40 DTs on 5 feeders on first startup. 
 
 For production, deploy the frontend separately from the backend:
 
-- **Frontend**: Vercel static site
-- **Backend**: Render, Railway, Fly.io, or similar container host
-- **Database**: Managed PostgreSQL from the same backend host
+- **Frontend**: Vercel â€” https://grid-watch-red.vercel.app/
+- **Backend**: Render â€” https://gridwatch-api.onrender.com
+- **Database**: Render Postgres, connected privately to the backend
 
 Set `VITE_API_URL` in the frontend project to the public backend URL, for example `https://gridwatch-api.onrender.com/api`. The local Docker setup still uses the same-origin `/api` proxy.
 
@@ -66,7 +77,7 @@ Set `VITE_API_URL` in the frontend project to the public backend URL, for exampl
 | **Debounce window (30s)** | Prevents flaky power_lost events from creating false tickets. |
 | **SSE over WebSocket** | Simpler deployment, works through reverse proxies on free hosting tiers. |
 | **No Redis** | At ~39 msg/s sustained, asyncio.Queue in-process is sufficient. Redis boundary: ~1,000 msg/s. |
-| **Template fallback for AI briefings** | Gemini API may be unavailable — system degrades gracefully. |
+| **Template fallback for AI briefings** | The optional local-LLM endpoint may be unavailable — system degrades gracefully. |
 | **System-only verified/closed** | Prevents crew from marking tickets as resolved when telemetry disagrees. |
 
 ## Fault Types Detected
@@ -88,11 +99,26 @@ The built-in simulator lets you inject faults and observe detection in real-time
 | 📡 Dead Sensor | Stops heartbeats for one pole (should NOT create ticket) |
 | 🔧 Repair | Sends restoration telemetry for an incident |
 
+## Verification
+
+The core detection-engine suite has 18 tests covering topology construction and
+inference, span/DT detection, dead-sensor suppression, grouping, confidence,
+lifecycle rules, stale events, and heartbeat timeouts. It was last run in the
+backend container with all 18 passing:
+
+```bash
+docker compose run --rm backend python tests/test_engine.py
+```
+
+`backend/tests/load_test.py` is a repeatable 5,000-event burst test. Its result
+is intentionally not claimed here because it has not been run against the
+public deployment.
+
 ## Tech Stack
 
-- **Backend**: Python 3.12, FastAPI, SQLAlchemy (async), PostgreSQL
+- **Backend**: Python 3.13, FastAPI, SQLAlchemy (async), PostgreSQL
 - **Frontend**: React 18, Vite, Leaflet
-- **AI**: Google Gemini Flash (optional, with template fallback)
+- **AI**: Optional local LLM endpoint (default Phi-3/Ollama-compatible API), with template fallback
 - **Infra**: Docker Compose
 
 ## Project Structure

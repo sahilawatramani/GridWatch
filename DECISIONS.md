@@ -1,5 +1,24 @@
 # Design Decisions — GridWatch
 
+## D11: Split Deployment and Explicit API Base URL
+
+**Decision**: Deploy the React/Vite console on Vercel and the FastAPI service
+plus Postgres on Render. The Vercel build receives
+`VITE_API_URL=https://gridwatch-api.onrender.com/api`.
+
+**Why**: Vercel is a good fit for a static Vite build, while Render runs the
+long-lived API, background workers, SSE stream, and managed Postgres. Keeping
+the database private avoids exposing credentials to the browser.
+
+**Important implementation detail**: Both REST requests and the SSE connection
+use `VITE_API_URL`. A hard-coded `/api/events/stream` would work under the local
+Vite proxy but would point to Vercel (and fail) in production.
+
+**Tradeoff**: The free Render service spins down while idle, so the first API
+request can be slow. This is documented in the README rather than hidden.
+
+---
+
 ## D1: MST vs Clustering for Topology Inference
 
 **Decision**: Minimum Spanning Tree (Kruskal's) oriented from DT root.
@@ -117,7 +136,7 @@ battery would generate a false fault ticket.
 
 ## D9: AI for Briefings, Not Localization
 
-**Decision**: LLM (Gemini Flash) generates phone-readable crew briefings. All
+**Decision**: An optional local LLM endpoint generates phone-readable crew briefings. All
 localization is deterministic graph traversal.
 
 **Why NOT use AI for localization**:
@@ -144,3 +163,31 @@ the official start time. Without grace, their prep work triggers false incidents
 `end` passes, every still-dark pole becomes a fault candidate. The 40-minute overrun
 lets normal restoration complete. If STILL dark after 80 minutes → promote to real fault
 with a confidence penalty.
+
+---
+
+## What Is Currently Fragile
+
+- Topology inference is geometric and can select an incorrect connection for
+  close parallel lines or dense branches. The UI reports inferred-edge
+  confidence, but it cannot turn an uncertain inferred edge into surveyed fact.
+- The ingest queue and SSE subscriber list are process-local. They are suitable
+  for this single-instance exercise deployment, not multi-instance production.
+- The public demo uses free hosting. Render can cold-start, and the free
+  database has platform limits; the demo video is therefore an important
+  submission backup.
+- End-to-end p95 latency and public 5,000-event burst throughput have not been
+  measured. The repository includes a load-test script instead of unsupported
+  performance claims.
+
+## With Two More Weeks
+
+1. Validate inferred topology against a field-survey sample, expose a
+   DT-level-only fallback when confidence is below an operator-safe threshold,
+   and add an operator correction workflow.
+2. Add durable ingestion (broker/queue), idempotent database constraints, and
+   shared SSE/event infrastructure so multiple API instances can run safely.
+3. Measure and publish end-to-end latency plus the 5,000-event burst result;
+   profile the database path and add alerting for queue depth and stale devices.
+4. Add integration tests for scheduled-outage suppression, restoration
+   verification, and the deployed browser-to-API/SSE path.
