@@ -43,22 +43,28 @@ npm install
 npm run dev -- --port 3000
 ```
 
-## Cloud Deployment (Railway / Render)
+## Cloud Deployment (Recommended Split)
 
-### Railway (Recommended)
-1. Create a new project from GitHub repo
-2. Railway auto-detects `docker-compose.yml`
-3. Add environment variables:
-   - `GEMINI_API_KEY` (optional)
-   - `DATABASE_URL` is auto-provisioned by Railway's Postgres plugin
-4. Deploy
+### 1) Backend on Render or Railway
+1. Create a new Web Service from the GitHub repo.
+2. Point it at the backend service folder if your platform supports a root directory, or use the backend Dockerfile.
+3. Set environment variables:
+   - `DATABASE_URL` required, from managed Postgres.
+   - `GEMINI_API_KEY` optional.
+   - `HEARTBEAT_SIM_ENABLED=true` recommended for the demo.
+4. Deploy the backend first and note its public API URL, such as `https://gridwatch-api.onrender.com`.
 
-### Render
-1. Create a new Web Service from GitHub
-2. **Backend**: Set build command to `pip install -r requirements.txt`, start command to `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-3. **Frontend**: Create a Static Site, build command `npm run build`, publish directory `dist`
-4. Add Render Postgres
-5. Set `DATABASE_URL` environment variable
+### 2) Frontend on Vercel
+1. Import the same GitHub repo into Vercel.
+2. Set the root directory to `frontend`.
+3. Add environment variable:
+   - `VITE_API_URL=https://gridwatch-api.onrender.com/api`
+4. Build command: `npm run build`
+5. Output directory: `dist`
+6. Deploy the frontend and verify the console loads data from the backend URL.
+
+### 3) Database
+Use the managed PostgreSQL service from the same backend host. The backend still performs table creation and seeding on startup.
 
 ### SSE Through Proxy
 SSE requires the proxy to NOT buffer responses. Most PaaS platforms handle this correctly for `text/event-stream` content type. If SSE isn't working:
@@ -80,7 +86,7 @@ docker compose restart backend  # Retry
 ```
 
 ### Frontend can't reach API
-The Vite dev server proxies `/api` to `http://backend:8000`. In production, configure your reverse proxy or set `VITE_API_URL`.
+The Vite dev server proxies `/api` to `http://backend:8000`. In production, set `VITE_API_URL` in Vercel so the frontend points at the public backend URL.
 
 ### Stale data / want to reset
 ```bash
@@ -96,6 +102,11 @@ docker compose up --build
 1. Check browser DevTools Network tab for `/api/events/stream`
 2. Should show `text/event-stream` content type
 3. If behind Cloudflare/nginx, disable response buffering
+
+### Frontend loads but shows no data on Vercel
+1. Confirm `VITE_API_URL` includes the backend `/api` path, for example `https://gridwatch-api.onrender.com/api`
+2. Rebuild the Vercel deployment after changing environment variables
+3. Open the backend `/api/health` URL directly to confirm the API is live
 
 ### "Module not found" errors
 ```bash

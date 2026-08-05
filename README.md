@@ -19,6 +19,16 @@ Open:
 
 The system auto-seeds ~3,000 poles across 40 DTs on 5 feeders on first startup. No manual setup needed.
 
+## Deployment Model
+
+For production, deploy the frontend separately from the backend:
+
+- **Frontend**: Vercel static site
+- **Backend**: Render, Railway, Fly.io, or similar container host
+- **Database**: Managed PostgreSQL from the same backend host
+
+Set `VITE_API_URL` in the frontend project to the public backend URL, for example `https://gridwatch-api.onrender.com/api`. The local Docker setup still uses the same-origin `/api` proxy.
+
 ## Architecture
 
 ```
