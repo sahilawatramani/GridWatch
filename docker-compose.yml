@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: gridwatch
+      POSTGRES_USER: gridwatch
+      POSTGRES_PASSWORD: gridwatch
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gridwatch"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://gridwatch:gridwatch@postgres:5432/gridwatch
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      LOCAL_LLM_URL: ${LOCAL_LLM_URL:-http://host.docker.internal:11434/api/generate}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-phi3}
+      HEARTBEAT_SIM_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:
