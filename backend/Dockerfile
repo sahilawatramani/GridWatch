@@ -1,4 +1,4 @@
-FROM python:3.13-alpine3.22 AS build
+FROM python:3.13-slim AS build
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ RUN python -m venv /opt/venv \
 
 COPY . .
 
-FROM gcr.io/distroless/python3-debian13
+FROM python:3.13-slim
 
 WORKDIR /app
 
