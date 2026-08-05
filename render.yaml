@@ -2,6 +2,7 @@ services:
   - type: web
     name: gridwatch-api
     runtime: docker
+    plan: free
     rootDir: backend
     dockerfilePath: ./Dockerfile
     autoDeploy: true
@@ -18,4 +19,4 @@ services:
 
 databases:
   - name: gridwatch-db
-    plan: starter
+    plan: free
