@@ -3,7 +3,7 @@ import MapView from './components/MapView';
 import IncidentList from './components/IncidentList';
 import IncidentDetail from './components/IncidentDetail';
 import SimulatorPanel from './components/SimulatorPanel';
-import { api } from './utils/api';
+import { api, API_BASE } from './utils/api';
 
 export default function App() {
   const [stats, setStats] = useState(null);
@@ -53,7 +53,7 @@ export default function App() {
 
   // SSE for real-time updates
   useEffect(() => {
-    const sse = new EventSource('/api/events/stream');
+    const sse = new EventSource(`${API_BASE}/events/stream`);
     sseRef.current = sse;
 
     sse.addEventListener('update', (e) => {

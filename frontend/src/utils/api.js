@@ -1,9 +1,9 @@
 /* API wrapper for GridWatch backend */
 
-const BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+export const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
   });
